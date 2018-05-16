@@ -20,17 +20,16 @@ use std::io::{Write};
 
 use regex::Regex;
 
-
+/// Matches Element Node name by regex.
 #[derive(Clone, Debug)]
 struct NameRegex {
     rx: regex::Regex
 }
 
 impl NameRegex {
-    fn new<T: AsRef<str>>(rx_str: T) -> Self {
-        NameRegex {
-            rx: regex::Regex::new(rx_str.as_ref()).unwrap()
-        }
+    fn new<T: AsRef<str>>(rx_str: T) -> Result<Self, Error> {
+        let rx = regex::Regex::new(rx_str.as_ref())?;
+        Ok(NameRegex { rx })
     }
 }
 
@@ -71,7 +70,7 @@ fn cat(chapters: &Vec<Vec<u8>>, with_headers: bool) -> Result<(), Error> {
     }
     let names = names.join(r"|");
 
-    let pred = NameRegex::new(names);
+    let pred = NameRegex::new(names)?;
 
     for chapter in chapters {
         let doc = Document::from(std::str::from_utf8(chapter).unwrap());
