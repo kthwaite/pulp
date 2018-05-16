@@ -1,0 +1,15 @@
+[package]
+name = "pulp"
+version = "0.1.0"
+authors = ["cthwaite <cthwaite@penguinrandomhouse.co.uk>"]
+
+[dependencies]
+epub = { git  = "https://github.com/cthwaite/epub-rs" }
+xml-rs = "0.7.0"
+select = "0.4.2"
+failure = "0.1.1"
+
+[dependencies.clap]
+version = "2.31.2"
+default-features = false
+features = ["suggestions", "color", "wrap_help"]
