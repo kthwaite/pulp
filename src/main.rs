@@ -30,8 +30,7 @@ fn get_chapters(book: &mut EpubDoc) -> Result<Vec<Vec<u8>>, Error> {
 
 fn pulp<P: AsRef<Path>>(path: P) -> Result<(), Error> {
     let mut book = EpubDoc::new(path)?;
-    let chapters = get_chapters(&mut book);
-    let chapters = chapters.expect("oh dear");
+    let chapters = get_chapters(&mut book)?;
 
     let stdout = io::stdout();
     let mut handle = stdout.lock();
@@ -39,7 +38,14 @@ fn pulp<P: AsRef<Path>>(path: P) -> Result<(), Error> {
         let doc = Document::from(std::str::from_utf8(chapter).unwrap());
         for node in doc.find(Name("p")) {
             // https://github.com/rust-lang/rust/issues/46016
-            handle.write_fmt(format_args!("{}\n", node.text())).unwrap();
+            if let Err(error) = handle.write_fmt(format_args!("{}\n", node.text())) {
+                if error.kind() == std::io::ErrorKind::BrokenPipe {
+                    return Ok(())
+                }
+                else {
+                    return Err(error.into());
+                }
+            }
         }
     };
     Ok(())
