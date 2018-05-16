@@ -9,7 +9,7 @@ use clap::{Arg, App};
 use epub::doc::EpubDoc;
 
 use select::document::Document;
-use select::predicate::{Name, Predicate};
+use select::predicate::Predicate;
 use select::node::Node;
 
 use failure::Error;
