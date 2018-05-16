@@ -20,7 +20,6 @@ use std::io::{Write};
 fn get_chapters(book: &mut EpubDoc) -> Result<Vec<Vec<u8>>, Error> {
     book.spine.iter()
         .filter(|res| res.starts_with("chapter"))
-        // .map(|s| s.clone())
         .cloned()
         .collect::<Vec<_>>()
         .into_iter()
