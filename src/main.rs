@@ -60,7 +60,7 @@ fn get_chapters(book: &mut EpubDoc) -> Result<Vec<Vec<u8>>, Error> {
 
 /// simple chapter output
 /// TODO: match on list of tags, rather than just 'p' and 'h\d'
-fn cat(chapters: &Vec<Vec<u8>>, with_headers: bool) -> Result<(), Error> {
+fn cat(chapters: &[Vec<u8>], with_headers: bool) -> Result<(), Error> {
     let stdout = io::stdout();
     let mut handle = stdout.lock();
 
@@ -108,7 +108,7 @@ fn main() {
             Ok(chapters) => {
                 match chapters.len() {
                     0 => println!("Input file contains no chapters"),
-                    _ => cat(&chapters, true).unwrap()
+                    _ => cat(&chapters, false).unwrap()
                 }
             },
             Err(e) => println!("{}", e)
