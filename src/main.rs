@@ -2,6 +2,7 @@ extern crate clap;
 extern crate epub;
 extern crate select;
 extern crate failure;
+extern crate regex;
 
 use clap::{Arg, App};
 
@@ -16,10 +17,15 @@ use std::path::Path;
 use std::io;
 use std::io::{Write};
 
+use regex::Regex;
 
+/// Get chapters from the spine.
+/// TODO: Optionally where the ID matches a regex.
+/// TODO: With switches for common front- and end-matter.
 fn get_chapters(book: &mut EpubDoc) -> Result<Vec<Vec<u8>>, Error> {
+    let rx = Regex::new(r"^.*(?:brief-toc|copyright|cover|title).*$|toc").unwrap();
     book.spine.iter()
-        .filter(|res| res.starts_with("chapter"))
+        .filter(|res| !rx.is_match(res))
         .cloned()
         .collect::<Vec<_>>()
         .into_iter()
@@ -27,14 +33,10 @@ fn get_chapters(book: &mut EpubDoc) -> Result<Vec<Vec<u8>>, Error> {
         .collect()
 }
 
-
-fn pulp<P: AsRef<Path>>(path: P) -> Result<(), Error> {
-    let mut book = EpubDoc::new(path)?;
-    let chapters = get_chapters(&mut book)?;
-
+fn cat(chapters: &Vec<Vec<u8>>) -> Result<(), Error> {
     let stdout = io::stdout();
     let mut handle = stdout.lock();
-    for chapter in &chapters {
+    for chapter in chapters {
         let doc = Document::from(std::str::from_utf8(chapter).unwrap());
         for node in doc.find(Name("p")) {
             // https://github.com/rust-lang/rust/issues/46016
@@ -51,6 +53,12 @@ fn pulp<P: AsRef<Path>>(path: P) -> Result<(), Error> {
     Ok(())
 }
 
+fn pulp<P: AsRef<Path>>(path: P) -> Result<Vec<Vec<u8>>, Error> {
+    let mut book = EpubDoc::new(path)?;
+    get_chapters(&mut book)
+}
+
+
 fn main() {
     let matches = App::new("pulp")
                     .version("0.0.0")
@@ -60,7 +68,12 @@ fn main() {
                     .get_matches();
     if let Some(path) = matches.value_of("FILE") {
         match pulp(path) {
-            Ok(()) => (),
+            Ok(chapters) => {
+                match chapters.len() {
+                    0 => println!("Input file contains no chapters"),
+                    _ => cat(&chapters).unwrap()
+                }
+            },
             Err(e) => println!("{}", e)
         }
     };
