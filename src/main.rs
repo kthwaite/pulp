@@ -1,117 +1,113 @@
 extern crate clap;
 extern crate epub;
-extern crate select;
+#[macro_use]
 extern crate failure;
+extern crate glob;
 extern crate regex;
+extern crate select;
 
-use clap::{Arg, App};
+mod extract;
+mod cat;
+mod meta;
 
+use clap::{Arg, App, SubCommand};
 use epub::doc::EpubDoc;
-
-use select::document::Document;
-use select::predicate::Predicate;
-use select::node::Node;
-
-use failure::Error;
-
-use std::path::Path;
-use std::io;
-use std::io::{Write};
-
 use regex::Regex;
+use std::path::PathBuf;
 
-/// Matches Element Node name by regex.
-#[derive(Clone, Debug)]
-struct NameRegex {
-    rx: regex::Regex
-}
-
-impl NameRegex {
-    fn new<T: AsRef<str>>(rx_str: T) -> Result<Self, Error> {
-        let rx = regex::Regex::new(rx_str.as_ref())?;
-        Ok(NameRegex { rx })
-    }
-}
-
-impl Predicate for NameRegex {
-    fn matches(&self, node: &Node) -> bool {
-        match node.name() {
-            Some(name) => self.rx.is_match(name),
-            None => false
-        }
-    }
-}
-
-
-/// Get chapters from the spine.
-/// TODO: Optionally where the ID matches a regex.
-/// TODO: With switches for common front- and end-matter.
-fn get_chapters(book: &mut EpubDoc) -> Result<Vec<Vec<u8>>, Error> {
-    let ignore = Regex::new(r"^.*(?:brief-toc|copyright|cover|title).*$|toc").unwrap();
-    book.spine.iter()
-        .filter(|res| !ignore.is_match(res))
-        .cloned()
-        .collect::<Vec<_>>()
-        .into_iter()
-        .map(|res| book.get_resource(&res))
-        .collect()
-}
-
-
-/// simple chapter output
-/// TODO: match on list of tags, rather than just 'p' and 'h\d'
-fn cat(chapters: &[Vec<u8>], with_headers: bool) -> Result<(), Error> {
-    let stdout = io::stdout();
-    let mut handle = stdout.lock();
-
-    let mut names : Vec<String> = vec![String::from("p")];
-    if with_headers {
-        names.push(String::from(r"h\d"));
-    }
-    let names = names.join(r"|");
-
-    let pred = NameRegex::new(names)?;
-
-    for chapter in chapters {
-        let doc = Document::from(std::str::from_utf8(chapter).unwrap());
-        for node in doc.find(pred.clone()) {
-            // https://github.com/rust-lang/rust/issues/46016
-            if let Err(error) = handle.write_fmt(format_args!("{}\n", node.text())) {
-                if error.kind() == std::io::ErrorKind::BrokenPipe {
-                    return Ok(())
-                }
-                else {
-                    return Err(error.into());
-                }
-            }
-        }
-    };
-    Ok(())
-}
-
-
-fn pulp<P: AsRef<Path>>(path: P) -> Result<Vec<Vec<u8>>, Error> {
-    let mut book = EpubDoc::new(path)?;
-    get_chapters(&mut book)
-}
+use cat::cat;
+use meta::list_meta;
 
 
 fn main() {
+    let meta_cmd = SubCommand::with_name("meta")
+                        .about("print ebook meta to stdout")
+                        .arg(Arg::with_name("FILE")
+                             .required(true))
+                        .arg(Arg::with_name("fields")
+                             .long("fields")
+                             .short("f")
+                             .takes_value(true))
+                        .arg(Arg::with_name("fieldnames")
+                             .long("with-fieldnames")
+                             .short("w")
+                             .takes_value(false));
+
+    let cat_cmd = SubCommand::with_name("cat")
+                        .about("cat epub contents to stdout")
+                        .arg(Arg::with_name("FILE")
+                             .required(true))
+                        .arg(Arg::with_name("match-paths")
+                             .short("p")
+                             .takes_value(true))
+                        .arg(Arg::with_name("match-ids")
+                             .short("i")
+                             .takes_value(true));
+
+    let grep_cmd = SubCommand::with_name("grep")
+                        .arg(Arg::with_name("EXPR")
+                             .required(true))
+                        .arg(Arg::with_name("path")
+                             .default_value("."));
+
     let matches = App::new("pulp")
-                    .version("0.0.0")
-                    .about("cat for ebook contents")
-                    .arg(Arg::with_name("FILE")
-                         .required(true))
+                    .version("0.0.1")
+                    .about("ebook multitool")
+                    .subcommand(cat_cmd)
+                    .subcommand(meta_cmd)
+                    .subcommand(grep_cmd)
                     .get_matches();
-    if let Some(path) = matches.value_of("FILE") {
-        match pulp(path) {
-            Ok(chapters) => {
-                match chapters.len() {
-                    0 => println!("Input file contains no chapters"),
-                    _ => cat(&chapters, false).unwrap()
-                }
-            },
+
+
+    if let Some(matches) = matches.subcommand_matches("cat") {
+        let path = matches.value_of("FILE").unwrap();
+        let mut book = EpubDoc::new(path).unwrap();
+        match cat(&mut book) {
+            Ok(_) => (),
             Err(e) => println!("{}", e)
         }
     };
+
+    if let Some(matches) = matches.subcommand_matches("grep") {
+        let regex = matches.value_of("EXPR").unwrap();
+        let regex = Regex::new(regex).unwrap();
+        let glob_expr = matches.value_of("path").unwrap();
+
+        let ebooks = glob::glob(glob_expr).unwrap()
+                                .filter(|path| path.is_ok())
+                                .map(|path| path.unwrap())
+                                .filter(|path| path.extension().is_some())
+                                .filter(|path| path.extension().unwrap() == "epub")
+                                .collect::<Vec<PathBuf>>();
+        if ebooks.len() == 0 {
+            println!("No files found or invalid glob expression");
+            return;
+        }
+        for path in ebooks {
+            match EpubDoc::new(&path) {
+                Ok(mut book) => {
+                    if cat::grep(&mut book, &regex).unwrap() {
+                        println!("{}", path.as_path().to_str().unwrap());
+                    }
+                },
+                Err(_error) => () // println!("{:?}", e)
+            }
+        }
+    }
+
+    if let Some(matches) = matches.subcommand_matches("meta") {
+        let path = matches.value_of("FILE").unwrap();
+        let with_fieldnames = matches.is_present("fieldnames");
+        let mut book = EpubDoc::new(path).unwrap();
+        match matches.value_of("fields") {
+            Some(fields) => {
+                let fields : Vec<String> = fields.split(",")
+                                                .into_iter()
+                                                .map(|s| s.to_owned())
+                                                .collect();
+                list_meta(&mut book, Some(&fields), with_fieldnames).unwrap()
+            },
+            None => list_meta(&mut book, None, with_fieldnames).unwrap()
+        };
+    }
 }
