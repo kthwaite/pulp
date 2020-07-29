@@ -1,31 +1,7 @@
 use epub::doc::EpubDoc;
-use failure::Error;
+use crate::error::Error;
 use regex::Regex;
-use select::predicate::Predicate;
-use select::node::Node;
 
-
-/// Matches Element Node name by regex.
-#[derive(Clone, Debug)]
-pub struct NameRegex {
-    rx: Regex
-}
-
-impl NameRegex {
-    pub fn new<T: AsRef<str>>(rx_str: T) -> Result<Self, Error> {
-        let rx = Regex::new(rx_str.as_ref())?;
-        Ok(NameRegex { rx })
-    }
-}
-
-impl Predicate for NameRegex {
-    fn matches(&self, node: &Node) -> bool {
-        match node.name() {
-            Some(name) => self.rx.is_match(name),
-            None => false
-        }
-    }
-}
 const FRONT_MATTER : [&str; 14] = [
     "cover-image",
     "cover",
@@ -62,8 +38,6 @@ const RESOURCE_IGNORE : [&str; 5] = [
 
 
 /// Get chapters from the spine.
-/// TODO: Optionally where the ID matches a regex.
-/// TODO: With switches for common front- and end-matter.
 pub fn get_chapters(book: &mut EpubDoc) -> Result<Vec<(String, Vec<u8>)>, Error> {
     let rx_str = format!(r"{}|{}", FRONT_MATTER.join(r"|"), END_MATTER.join(r"|"));
     let ignore = Regex::new(&rx_str).unwrap();

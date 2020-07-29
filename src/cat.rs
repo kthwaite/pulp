@@ -1,82 +1,69 @@
-use extract::get_chapters;
-use failure::Error;
-use select::document::Document;
 use epub::doc::EpubDoc;
-use regex::Regex;
-
 use std::io::Write;
 
-use extract::NameRegex;
+use crate::error::Error;
+use crate::extract::get_chapters;
 
-/// simple chapter output
-/// TODO: match on list of tags, rather than just 'p' and 'h\d'
-pub fn cat_impl<W: Write>(handle: &mut W, chapters: &[(String, Vec<u8>)], with_headers: bool) -> Result<(), Error> {
-
-    let mut names : Vec<String> = vec![String::from("p")];
-    if with_headers {
-        names.push(String::from(r"h\d"));
-    }
-    let names = names.join(r"|");
-
-    let pred = NameRegex::new(names)?;
-
-    for (_res, chapter) in chapters {
-        let doc = Document::from(::std::str::from_utf8(chapter).unwrap());
-        for node in doc.find(pred.clone()) {
-            // https://github.com/rust-lang/rust/issues/46016
-            if let Err(error) = handle.write_fmt(format_args!("{}\n", node.text())) {
-                if error.kind() == ::std::io::ErrorKind::BrokenPipe {
-                    return Ok(())
-                }
-                else {
-                    return Err(error.into());
-                }
-            }
+fn write_check_pipe<W: Write>(handle: &mut W, text: &str) -> Result<(), Error> {
+    if let Err(error) = handle.write_fmt(format_args!("{}", text)) {
+        if error.kind() == ::std::io::ErrorKind::BrokenPipe {
+            return Ok(());
+        } else {
+            return Err(error.into());
         }
-    };
+    }
     Ok(())
 }
 
-pub fn grep(mut book: &mut EpubDoc, rx: &Regex) -> Result<bool, Error> {
-    let chapters = match get_chapters(&mut book) {
-        Ok(p_chapters) => {
-            match p_chapters.len() {
-                0 => bail!("No chapters found in eBook"),
-                _ => p_chapters
-            }
-        },
-        Err(e) => return Err(e)
-    };
+pub fn cat_plain_recursive<'a, W: Write>(
+    handle: &mut W,
+    node: roxmltree::Node<'a, 'a>,
+) -> Result<(), Error> {
+    for desc in node.descendants().skip(1) {
+        match desc.node_type() {
+            roxmltree::NodeType::Text => write_check_pipe(handle, desc.text().unwrap_or(""))?,
+            roxmltree::NodeType::Element => match desc.tag_name().name() {
+                // TODO: anything else?
+                "br" => write_check_pipe(handle, "\n")?,
+                _ => (),
+            },
+            _ => (),
+        }
+    }
+    match node.tag_name().name() {
+        "h1" | "h2" | "p" => write_check_pipe(handle, "\n"),
+        _ => Ok(()),
+    }
+}
 
-    let names : Vec<String> = vec![String::from("p")];
-    let names = names.join(r"|");
-
-    let pred = NameRegex::new(names)?;
-
-    for (_res, chapter) in chapters {
-        let doc = Document::from(::std::str::from_utf8(&chapter).unwrap());
-        for node in doc.find(pred.clone()) {
-            // https://github.com/rust-lang/rust/issues/46016
-            if rx.is_match(&node.text()) {
-                return Ok(true);
+pub fn cat_plain<W: Write>(
+    handle: &mut W,
+    chapters: &[(String, Vec<u8>)],
+) -> Result<(), Error> {
+    'chapter_iter: for (_res, chapter) in chapters {
+        let doc = roxmltree::Document::parse(::std::str::from_utf8(chapter).unwrap()).unwrap();
+        let root = match doc.root().first_child() {
+            None => continue 'chapter_iter,
+            Some(root_node) => root_node,
+        };
+        for node in root.children() {
+            if let "body" = node.tag_name().name() {
+                for child in node.children() {
+                    cat_plain_recursive(handle, child)?
+                }
             }
         }
-    };
-    Ok(false)
+        write_check_pipe(handle, "\n")?;
+    }
+    Ok(())
 }
 
 pub fn cat(mut book: &mut EpubDoc) -> Result<(), Error> {
-    let chapters = match get_chapters(&mut book) {
-        Ok(p_chapters) => {
-            match p_chapters.len() {
-                0 => bail!("No chapters found in eBook"),
-                _ => p_chapters
-            }
-        },
-        Err(e) => return Err(e)
-    };
+    let chapters = get_chapters(&mut book).and_then(|p_chapters| match p_chapters.len() {
+        0 => Err(Error::NoChapters),
+        _ => Ok(p_chapters),
+    })?;
     let stdout = ::std::io::stdout();
     let mut handle = stdout.lock();
-    cat_impl(&mut handle, &chapters, false)
+    cat_plain(&mut handle, &chapters)
 }
-
