@@ -2,6 +2,7 @@ mod cat;
 mod error;
 mod extract;
 mod meta;
+mod chapter;
 
 use clap::{App, AppSettings, Arg};
 use epub::doc::EpubDoc;
@@ -16,6 +17,7 @@ fn main() -> Result<(), Error> {
         .about("cat epub contents to stdout")
         .arg(Arg::with_name("FILE").required(true))
         .arg(Arg::with_name("meta").long("meta").help("Print ebook metadata and quit").required(false))
+        .arg(Arg::with_name("json").long("json").short("json").help("Print output as JSON").required(false))
         .get_matches();
 
     let path = app_input.value_of("FILE").expect("Must pass FILE");
@@ -35,6 +37,6 @@ fn main() -> Result<(), Error> {
         }
         return Ok(())
     }
-    cat(&mut book)?;
+    cat(&mut book, app_input.is_present("json"))?;
     Ok(())
 }
