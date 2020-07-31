@@ -138,6 +138,7 @@ impl MetadataBuilder {
                 _ => (),
             }
         }
+        bld
     }
     pub fn build(mut self) -> Metadata {
         for (key, refines) in self.refines {
