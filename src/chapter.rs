@@ -11,7 +11,7 @@ impl Chapter {
     pub fn with_res(self, res: &str) -> Self {
         Self {
             res: res.to_string(),
-            .. self
+            ..self
         }
     }
 }

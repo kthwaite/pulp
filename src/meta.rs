@@ -167,7 +167,7 @@ struct Metadata {
     pub ids: HashMap<String, String>,
 }
 
-fn from_opf<'a>(doc: roxmltree::Document<'a>) {
+fn from_opf(doc: roxmltree::Document) {
     let ch = doc.root().first_child().unwrap();
 
     fn find_meta<'a>(ch: roxmltree::Node<'a, 'a>) -> Option<roxmltree::Node<'a, 'a>> {

@@ -1,8 +1,8 @@
 mod cat;
+mod chapter;
 mod error;
 mod extract;
 mod meta;
-mod chapter;
 
 use clap::{App, AppSettings, Arg};
 use epub::doc::EpubDoc;

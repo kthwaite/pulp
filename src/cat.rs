@@ -37,10 +37,7 @@ pub fn cat_plain_recursive<'a, W: Write>(
     }
 }
 
-pub fn cat_plain<W: Write>(
-    handle: &mut W,
-    chapters: &[(String, Vec<u8>)],
-) -> Result<(), Error> {
+pub fn cat_plain<W: Write>(handle: &mut W, chapters: &[(String, Vec<u8>)]) -> Result<(), Error> {
     'chapter_iter: for (_res, chapter) in chapters {
         let doc = roxmltree::Document::parse(::std::str::from_utf8(chapter).unwrap()).unwrap();
         let root = match doc.root().first_child() {
@@ -80,10 +77,7 @@ pub fn cat_span_recursive<'a, W: Write>(
     }
 }
 
-pub fn cat_json<W: Write>(
-    handle: &mut W,
-    chapters: &[(String, Vec<u8>)],
-) -> Result<(), Error> {
+pub fn cat_json<W: Write>(handle: &mut W, chapters: &[(String, Vec<u8>)]) -> Result<(), Error> {
     let mut chaps = Vec::<Chapter>::new();
     'chapter_iter: for (res, chapter) in chapters {
         let doc = roxmltree::Document::parse(::std::str::from_utf8(chapter).unwrap()).unwrap();
@@ -124,7 +118,7 @@ pub fn cat_json<W: Write>(
                             }
                             chap.spans.push(text);
                         }
-                        _ => ()
+                        _ => (),
                     }
                 }
             }
