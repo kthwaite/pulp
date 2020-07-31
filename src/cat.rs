@@ -1,9 +1,11 @@
 use epub::doc::EpubDoc;
 use std::io::Write;
 
-use crate::chapter::Chapter;
+use crate::book::{Book, Chapter};
 use crate::error::Error;
 use crate::extract::get_chapters;
+use crate::meta::{MetaVar, meta_vars_from_metadata};
+
 
 fn write_check_pipe<W: Write>(handle: &mut W, text: &str) -> Result<(), Error> {
     if let Err(error) = handle.write_fmt(format_args!("{}", text)) {
@@ -77,7 +79,7 @@ pub fn cat_span_recursive<'a, W: Write>(
     }
 }
 
-pub fn cat_json<W: Write>(handle: &mut W, chapters: &[(String, Vec<u8>)]) -> Result<(), Error> {
+pub fn cat_json(chapters: &[(String, Vec<u8>)]) -> Result<Vec<Chapter>, Error> {
     let mut chaps = Vec::<Chapter>::new();
     'chapter_iter: for (res, chapter) in chapters {
         let doc = roxmltree::Document::parse(::std::str::from_utf8(chapter).unwrap()).unwrap();
@@ -125,20 +127,24 @@ pub fn cat_json<W: Write>(handle: &mut W, chapters: &[(String, Vec<u8>)]) -> Res
         }
         chaps.push(chap);
     }
-    serde_json::to_writer(handle, &chaps).unwrap();
-    Ok(())
+    Ok(chaps)
 }
 
 pub fn cat(mut book: &mut EpubDoc, as_json: bool) -> Result<(), Error> {
-    let chapters = get_chapters(&mut book).and_then(|p_chapters| match p_chapters.len() {
+    let raw_chapters = get_chapters(&mut book).and_then(|p_chapters| match p_chapters.len() {
         0 => Err(Error::NoChapters),
         _ => Ok(p_chapters),
     })?;
     let stdout = ::std::io::stdout();
     let mut handle = stdout.lock();
     if as_json {
-        cat_json(&mut handle, &chapters)
+        let chapters = cat_json(&raw_chapters)?;
+        let book = Book {
+            meta: meta_vars_from_metadata(&book),
+            chapters,
+        };
+        serde_json::to_writer(handle, &book).map_err(Error::JsonError)
     } else {
-        cat_plain(&mut handle, &chapters)
+        cat_plain(&mut handle, &raw_chapters)
     }
 }

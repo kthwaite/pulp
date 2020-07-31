@@ -1,4 +1,8 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
+
+use crate::meta::MetaVar;
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
 pub struct Chapter {
@@ -14,4 +18,10 @@ impl Chapter {
             ..self
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Book {
+    pub chapters: Vec<Chapter>,
+    pub meta: HashMap<String, MetaVar>,
 }

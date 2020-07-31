@@ -1,5 +1,7 @@
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
+use epub::doc::EpubDoc;
 
 const DEFAULT_FIELDS: [&str; 11] = [
     "title",
@@ -15,7 +17,7 @@ const DEFAULT_FIELDS: [&str; 11] = [
     "type",
 ];
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum MetaVar {
     One(String),

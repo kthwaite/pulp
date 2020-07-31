@@ -1,5 +1,5 @@
+mod book;
 mod cat;
-mod chapter;
 mod error;
 mod extract;
 mod meta;
