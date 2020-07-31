@@ -16,27 +16,30 @@ fn main() -> Result<(), Error> {
         .version("0.0.1")
         .about("cat epub contents to stdout")
         .arg(Arg::with_name("FILE").required(true))
-        .arg(Arg::with_name("meta").long("meta").help("Print ebook metadata and quit").required(false))
-        .arg(Arg::with_name("json").long("json").short("json").help("Print output as JSON").required(false))
+        .arg(
+            Arg::with_name("meta")
+                .long("meta")
+                .help("Print ebook metadata and quit")
+                .required(false),
+        )
+        .arg(
+            Arg::with_name("json")
+                .long("json")
+                .short("json")
+                .help("Print output as JSON")
+                .required(false),
+        )
         .get_matches();
 
     let path = app_input.value_of("FILE").expect("Must pass FILE");
     let mut book = EpubDoc::new(path).expect("Failed to extract epub");
 
     if app_input.is_present("meta") {
-        for (key, values) in book.metadata {
-            match values.len() {
-                1 => println!("{}: {}", key, values[0]),
-                _ => {
-                    println!("{}", key);
-                    for val in values {
-                        println!("    {}", val);
-                    }
-                }
-            }
-        }
-        return Ok(())
+        let stdout = ::std::io::stdout();
+        let mut handle = stdout.lock();
+        let map = meta::meta_vars_from_metadata(&book);
+        serde_json::to_writer(handle, &map).map_err(Error::JsonError)
+    } else {
+        cat(&mut book, app_input.is_present("json"))
     }
-    cat(&mut book, app_input.is_present("json"))?;
-    Ok(())
 }

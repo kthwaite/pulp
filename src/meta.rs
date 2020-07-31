@@ -15,6 +15,24 @@ const DEFAULT_FIELDS: [&str; 11] = [
     "type",
 ];
 
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MetaVar {
+    One(String),
+    Many(Vec<String>),
+}
+
+/// Create a JSON-serializable table of MetaVars from a book's metadata HashMap.
+pub fn meta_vars_from_metadata(book: &EpubDoc) -> HashMap<String, MetaVar> {
+    book.metadata
+        .iter()
+        .map(|(key, values)| match values.len() {
+            1 => (key.clone(), MetaVar::One(values[0].clone())),
+            _ => (key.clone(), MetaVar::Many(values.clone())),
+        })
+        .collect()
+}
+
 #[derive(Debug)]
 pub enum OpfMeta {
     Bare(String),
