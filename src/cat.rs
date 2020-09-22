@@ -1,11 +1,10 @@
 use epub::doc::EpubDoc;
-use std::io::Write;
+use std::io::{Read, Seek, Write};
 
 use crate::book::{Book, Chapter};
 use crate::error::Error;
 use crate::extract::get_chapters;
-use crate::meta::{MetaVar, meta_vars_from_metadata};
-
+use crate::meta::{meta_vars_from_metadata, MetaVar};
 
 fn write_check_pipe<W: Write>(handle: &mut W, text: &str) -> Result<(), Error> {
     if let Err(error) = handle.write_fmt(format_args!("{}", text)) {
@@ -130,7 +129,7 @@ pub fn cat_json(chapters: &[(String, Vec<u8>)]) -> Result<Vec<Chapter>, Error> {
     Ok(chaps)
 }
 
-pub fn cat(mut book: &mut EpubDoc, as_json: bool) -> Result<(), Error> {
+pub fn cat<R: Read + Seek>(mut book: &mut EpubDoc<R>, as_json: bool) -> Result<(), Error> {
     let raw_chapters = get_chapters(&mut book).and_then(|p_chapters| match p_chapters.len() {
         0 => Err(Error::NoChapters),
         _ => Ok(p_chapters),

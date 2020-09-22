@@ -1,6 +1,8 @@
-use crate::error::Error;
+use std::io::{Read, Seek};
 use epub::doc::EpubDoc;
 use regex::Regex;
+
+use crate::error::Error;
 
 const FRONT_MATTER: [&str; 14] = [
     "cover-image",
@@ -30,7 +32,7 @@ const RESOURCE_IGNORE: [&str; 5] = [
 ];
 
 /// Get chapters from the spine.
-pub fn get_chapters(book: &mut EpubDoc) -> Result<Vec<(String, Vec<u8>)>, Error> {
+pub fn get_chapters<R: Read + Seek>(book: &mut EpubDoc<R>) -> Result<Vec<(String, Vec<u8>)>, Error> {
     let rx_str = format!(r"{}|{}", FRONT_MATTER.join(r"|"), END_MATTER.join(r"|"));
     let ignore = Regex::new(&rx_str).unwrap();
 

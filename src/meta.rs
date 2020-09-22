@@ -1,7 +1,8 @@
 use std::collections::HashMap;
+use std::io::{Read, Seek};
 
-use serde::{Deserialize, Serialize};
 use epub::doc::EpubDoc;
+use serde::{Deserialize, Serialize};
 
 const DEFAULT_FIELDS: [&str; 11] = [
     "title",
@@ -25,7 +26,7 @@ pub enum MetaVar {
 }
 
 /// Create a JSON-serializable table of MetaVars from a book's metadata HashMap.
-pub fn meta_vars_from_metadata(book: &EpubDoc) -> HashMap<String, MetaVar> {
+pub fn meta_vars_from_metadata<R: Read+ Seek>(book: &EpubDoc<R>) -> HashMap<String, MetaVar> {
     book.metadata
         .iter()
         .map(|(key, values)| match values.len() {
