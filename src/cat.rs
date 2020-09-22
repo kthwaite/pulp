@@ -90,7 +90,7 @@ pub fn cat_json(chapters: &[(String, Vec<u8>)]) -> Result<Vec<Chapter>, Error> {
         let mut first_header = true;
         for node in root.children() {
             if let "body" = node.tag_name().name() {
-                for child in node.children() {
+                for child in node.descendants() {
                     match child.tag_name().name() {
                         "h1" | "h2" => {
                             if first_header {
