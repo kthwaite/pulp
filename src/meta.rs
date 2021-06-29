@@ -26,7 +26,7 @@ pub enum MetaVar {
 }
 
 /// Create a JSON-serializable table of MetaVars from a book's metadata HashMap.
-pub fn meta_vars_from_metadata<R: Read+ Seek>(book: &EpubDoc<R>) -> HashMap<String, MetaVar> {
+pub fn meta_vars_from_metadata<R: Read + Seek>(book: &EpubDoc<R>) -> HashMap<String, MetaVar> {
     book.metadata
         .iter()
         .map(|(key, values)| match values.len() {

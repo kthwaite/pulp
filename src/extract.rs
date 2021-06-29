@@ -1,6 +1,6 @@
-use std::io::{Read, Seek};
 use epub::doc::EpubDoc;
 use regex::Regex;
+use std::io::{Read, Seek};
 
 use crate::error::Error;
 
@@ -32,7 +32,9 @@ const RESOURCE_IGNORE: [&str; 5] = [
 ];
 
 /// Get chapters from the spine.
-pub fn get_chapters<R: Read + Seek>(book: &mut EpubDoc<R>) -> Result<Vec<(String, Vec<u8>)>, Error> {
+pub fn get_chapters<R: Read + Seek>(
+    book: &mut EpubDoc<R>,
+) -> Result<Vec<(String, Vec<u8>)>, Error> {
     let rx_str = format!(r"{}|{}", FRONT_MATTER.join(r"|"), END_MATTER.join(r"|"));
     let ignore = Regex::new(&rx_str).unwrap();
 
