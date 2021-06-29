@@ -93,30 +93,28 @@ pub fn cat_json(chapters: &[(String, Vec<u8>)]) -> Result<Vec<Chapter>, Error> {
                 for child in node.descendants() {
                     match child.tag_name().name() {
                         "h1" | "h2" => {
+                            let head = child
+                                .descendants()
+                                .filter(|desc| desc.node_type() == roxmltree::NodeType::Text)
+                                .fold(String::new(), |mut accu, desc| {
+                                    accu.push_str(desc.text().unwrap_or(""));
+                                    accu
+                                });
                             if first_header {
-                                for desc in child.descendants() {
-                                    if desc.node_type() == roxmltree::NodeType::Text {
-                                        chap.header.push_str(desc.text().unwrap_or(""));
-                                    }
-                                }
                                 first_header = false;
+                                chap.header = head;
                             } else {
-                                let mut head = String::new();
-                                for desc in child.descendants() {
-                                    if desc.node_type() == roxmltree::NodeType::Text {
-                                        head.push_str(desc.text().unwrap_or(""));
-                                    }
-                                }
                                 chap.spans.push(head);
                             }
                         }
                         "p" => {
-                            let mut text = String::new();
-                            for desc in child.descendants() {
-                                if desc.node_type() == roxmltree::NodeType::Text {
-                                    text.push_str(desc.text().unwrap_or(""));
-                                }
-                            }
+                            let text = child
+                                .descendants()
+                                .filter(|desc| desc.node_type() == roxmltree::NodeType::Text)
+                                .fold(String::new(), |mut accu, desc| {
+                                    accu.push_str(desc.text().unwrap_or(""));
+                                    accu
+                                });
                             chap.spans.push(text);
                         }
                         _ => (),
