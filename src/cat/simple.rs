@@ -227,12 +227,12 @@ pub fn transform_simple<R: Read + Seek>(book: &mut EpubDoc<R>) -> Result<SimpleB
                 .get_resource_by_path(&*path)
                 .with_context(|| format!("Failed to get resource: {:?}", item))?;
             read_content_simple(
-                item.path_as_string(),
-                item.label,
+                item.path_as_string().clone(),
+                item.label.clone(),
                 data,
                 &mut buf,
                 &custom_entities,
-            )
+            ).with_context(|| format!("Failed to parse resource: {:?}", item))
         })
         .collect::<Result<Vec<SimpleChapter>>>()?;
     Ok(SimpleBook {
