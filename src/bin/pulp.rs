@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::{BufReader, Read, Seek};
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
@@ -7,6 +8,7 @@ use epub::doc::EpubDoc;
 
 use pulp::cat::simple::transform_simple;
 use pulp::extract::{flatten_navpoints, ResourceExtractorBuilder};
+use pulp::find::EbookDirIter;
 use pulp::meta;
 
 fn load_epub(cmd_args: &ArgMatches) -> Result<EpubDoc<BufReader<File>>> {
@@ -87,6 +89,31 @@ fn main() -> Result<()> {
                 .about("Print content as JSON")
                 .arg(Arg::with_name("FILE").required(true)),
         )
+        .subcommand(
+            SubCommand::with_name("batch")
+                .about("Batch-process books")
+                .arg(
+                    Arg::with_name("dir")
+                        .short("d")
+                        .long("dir")
+                        .takes_value(true)
+                        .help("Directory containing epub files"),
+                )
+                .arg(
+                    Arg::with_name("glob")
+                        .short("g")
+                        .long("glob")
+                        .takes_value(true)
+                        .help("Glob expression"),
+                )
+                .arg(
+                    Arg::with_name("dry-run")
+                        .short("d")
+                        .long("dry-run")
+                        .takes_value(false)
+                        .help("Print files that would be processed, but do nothing"),
+                ),
+        )
         .get_matches();
 
     match app_input.subcommand() {
@@ -123,6 +150,23 @@ fn main() -> Result<()> {
         ("toc", Some(cmd_args)) => {
             let book = load_epub(cmd_args)?;
             cmd_describe_toc(book, cmd_args.is_present("json"))?;
+        }
+        ("batch", Some(cmd_args)) => {
+            let mut file_list: Vec<PathBuf> = vec![];
+            if let Some(dir) = cmd_args.value_of("dir") {
+                file_list.extend(dir.iter_ebooks()?);
+            };
+            file_list.sort();
+            if cmd_args.is_present("dry-run") {
+                for path in file_list {
+                    match path.to_str() {
+                        Some(path) => println!("{}", path),
+                        None => {
+                            println!("{}", path.to_string_lossy());
+                        }
+                    }
+                }
+            }
         }
         _ => {}
     }
