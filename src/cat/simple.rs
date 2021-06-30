@@ -183,18 +183,30 @@ fn unhash_path(item: &ResourceInfo) -> Cow<str> {
     path
 }
 
+/// Transform a string literal mapping into a HashMap mapping bytes to bytes.
+macro_rules! bytes_map {
+    { $($key: expr => $value: expr),+ $(,)* } => {
+                                               {
+        let mut _hashmap : HashMap<Vec<u8>, Vec<u8>> = Default::default();
+        $( _hashmap.insert($key.as_bytes().to_vec(), $value.as_bytes().to_vec()); )+
+        _hashmap
+                                               }
+    }
+}
+
 /// Get the default custom entities for unencoding ebook text.
 pub fn default_custom_entities() -> HashMap<Vec<u8>, Vec<u8>> {
-    let mut custom_entities = HashMap::default();
-    custom_entities.insert(b"nbsp".to_vec(), b"".to_vec());
-    custom_entities.insert(b"ndash".to_vec(), b"\xe2\x80\x93".to_vec());
-    custom_entities.insert(b"mdash".to_vec(), b"\xe2\x80\x94".to_vec());
-    custom_entities.insert(b"iquest".to_vec(), b"\xc2\xbf".to_vec());
-    custom_entities.insert(b"lsquo".to_vec(), b"\xe2\x80\x98".to_vec());
-    custom_entities.insert(b"rsquo".to_vec(), b"\xe2\x80\x99".to_vec());
-    custom_entities.insert(b"middot".to_vec(), b"\xc2\xb7".to_vec());
-    custom_entities.insert(b"shy".to_vec(), b"\xc2\xad".to_vec());
-    custom_entities
+    bytes_map! {
+        "nbsp" => "",
+        "mdash" => "—",
+        "ndash" => "–",
+        "iquest" => "¿",
+        "lsquo" => "‘",
+        "rsquo" => "’",
+        "middot" => "·",
+        "shy" => "-",
+        "eacute" => "é",
+    }
 }
 
 /// Iterate over chapters in a book, creating a SimpleBook.
