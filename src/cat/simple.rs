@@ -9,7 +9,7 @@ use quick_xml::{events::Event, Reader};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    extract::{ResourceExtractorBuilder, ResourceInfo},
+    extract::{ResourceExtractor, ResourceExtractorBuilder, ResourceInfo},
     meta::MetaVar,
 };
 
@@ -214,34 +214,51 @@ pub fn default_custom_entities() -> HashMap<Vec<u8>, Vec<u8>> {
     }
 }
 
-/// Iterate over chapters in a book, creating a SimpleBook.
-pub fn transform_simple<R: Read + Seek>(book: &mut EpubDoc<R>) -> Result<SimpleBook> {
-    let meta_map = crate::meta::meta_vars_from_metadata(book);
+pub struct SimpleTransformer {
+    buf: Vec<u8>,
+    custom_entities: HashMap<Vec<u8>, Vec<u8>>,
+    ext: ResourceExtractor,
+}
 
-    let ext = ResourceExtractorBuilder::default().build()?;
-    let extracted = ext.extract(book)?;
-    let mut buf = Vec::default();
-
-    let custom_entities = default_custom_entities();
-    let parsed_chapters = extracted
-        .unique_candidates()
-        .into_iter()
-        .map(|item| -> Result<SimpleChapter> {
-            let path = unhash_path(&item);
-            let data = book
-                .get_resource_by_path(&*path)
-                .with_context(|| format!("Failed to get resource: {:?}", item))?;
-            read_content_simple(
-                item.path_as_string().clone(),
-                item.label.clone(),
-                data,
-                &mut buf,
-                &custom_entities,
-            ).with_context(|| format!("Failed to parse resource: {:?}", item))
+// TODO: builder pattern
+// TODO: traitify transformer
+impl SimpleTransformer {
+    pub fn new() -> Result<Self> {
+        let ext = ResourceExtractorBuilder::default().build()?;
+        let buf = Vec::new();
+        let custom_entities = default_custom_entities();
+        Ok(Self {
+            buf,
+            ext,
+            custom_entities,
         })
-        .collect::<Result<Vec<SimpleChapter>>>()?;
-    Ok(SimpleBook {
-        meta: meta_map,
-        chapters: parsed_chapters,
-    })
+    }
+    /// Iterate over chapters in a book, creating a SimpleBook.
+    pub fn transform<R: Read + Seek>(&mut self, book: &mut EpubDoc<R>) -> Result<SimpleBook> {
+        let extracted = self.ext.extract(book)?;
+        let parsed_chapters = extracted
+            .unique_candidates()
+            .into_iter()
+            .map(|item| -> Result<SimpleChapter> {
+                let path = unhash_path(&item);
+                let data = book
+                    .get_resource_by_path(&*path)
+                    .with_context(|| format!("Failed to get resource: {:?}", item))?;
+                read_content_simple(
+                    item.path_as_string().clone(),
+                    item.label.clone(),
+                    data,
+                    &mut self.buf,
+                    &self.custom_entities,
+                )
+                .with_context(|| format!("Failed to parse resource: {:?}", item))
+            })
+            .collect::<Result<Vec<SimpleChapter>>>()?;
+
+        let meta_map = crate::meta::meta_vars_from_metadata(book);
+        Ok(SimpleBook {
+            meta: meta_map,
+            chapters: parsed_chapters,
+        })
+    }
 }

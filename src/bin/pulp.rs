@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use epub::doc::EpubDoc;
 
-use pulp::cat::simple::transform_simple;
+use pulp::cat::simple::SimpleTransformer;
 use pulp::extract::{flatten_navpoints, ResourceExtractorBuilder};
 use pulp::find::EbookFinder;
 use pulp::meta;
@@ -128,7 +128,7 @@ fn main() -> Result<()> {
         }
         ("json", Some(cmd_args)) => {
             let mut book = load_epub(cmd_args)?;
-            let simple_book = transform_simple(&mut book)?;
+            let simple_book = SimpleTransformer::new()?.transform(&mut book)?;
 
             let stdout = ::std::io::stdout();
             let handle = stdout.lock();
