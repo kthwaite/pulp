@@ -206,6 +206,11 @@ pub fn default_custom_entities() -> HashMap<Vec<u8>, Vec<u8>> {
         "middot" => "·",
         "shy" => "-",
         "eacute" => "é",
+        "acirc" => "â",
+        "auml" => "ä",
+        "ldquo" => "“",
+        "rdquo" => "”",
+        "Eacute" => "É",
     }
 }
 
