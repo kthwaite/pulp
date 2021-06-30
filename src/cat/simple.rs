@@ -1,12 +1,17 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek};
+use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use epub::doc::EpubDoc;
 use quick_xml::{events::Event, Reader};
 use serde::{Deserialize, Serialize};
 
-use crate::{extract::ResourceExtractorBuilder, meta::MetaVar};
+use crate::{
+    extract::{ResourceExtractorBuilder, ResourceInfo},
+    meta::MetaVar,
+};
 
 /// Simple representation of book chapter content.
 #[derive(Debug, Deserialize, Serialize)]
@@ -97,6 +102,7 @@ pub fn read_content_simple(
     label: String,
     data: Vec<u8>,
     buf: &mut Vec<u8>,
+    custom_entities: &HashMap<Vec<u8>, Vec<u8>>,
 ) -> Result<SimpleChapter> {
     let mut rdr = Reader::from_reader(Cursor::new(data));
     let mut tra = SimpleAggregator::new(doc, label);
@@ -116,7 +122,7 @@ pub fn read_content_simple(
     'read_body: loop {
         match rdr.read_event(buf)? {
             Event::Text(ref e) => {
-                let unescaped = e.unescaped()?;
+                let unescaped = e.unescaped_with_custom_entities(custom_entities)?;
                 let text = rdr.decode(&unescaped)?;
                 tra.push_str(text);
             }
@@ -164,6 +170,33 @@ pub fn read_content_simple(
     Ok(tra.into())
 }
 
+// FIXME: refactor and remove
+fn unhash_path(item: &ResourceInfo) -> Cow<str> {
+    let path = match item.path.to_str() {
+        Some(path) => path.to_string(),
+        None => item.path.to_string_lossy().to_string(),
+    };
+    let path = match path.rfind("#") {
+        Some(index) => Cow::from(path[..index].to_string()),
+        None => Cow::from(path),
+    };
+    path
+}
+
+/// Get the default custom entities for unencoding ebook text.
+pub fn default_custom_entities() -> HashMap<Vec<u8>, Vec<u8>> {
+    let mut custom_entities = HashMap::default();
+    custom_entities.insert(b"nbsp".to_vec(), b"".to_vec());
+    custom_entities.insert(b"ndash".to_vec(), b"\xe2\x80\x93".to_vec());
+    custom_entities.insert(b"mdash".to_vec(), b"\xe2\x80\x94".to_vec());
+    custom_entities.insert(b"iquest".to_vec(), b"\xc2\xbf".to_vec());
+    custom_entities.insert(b"lsquo".to_vec(), b"\xe2\x80\x98".to_vec());
+    custom_entities.insert(b"rsquo".to_vec(), b"\xe2\x80\x99".to_vec());
+    custom_entities.insert(b"middot".to_vec(), b"\xc2\xb7".to_vec());
+    custom_entities.insert(b"shy".to_vec(), b"\xc2\xad".to_vec());
+    custom_entities
+}
+
 /// Iterate over chapters in a book, creating a SimpleBook.
 pub fn transform_simple<R: Read + Seek>(book: &mut EpubDoc<R>) -> Result<SimpleBook> {
     let meta_map = crate::meta::meta_vars_from_metadata(book);
@@ -171,12 +204,23 @@ pub fn transform_simple<R: Read + Seek>(book: &mut EpubDoc<R>) -> Result<SimpleB
     let ext = ResourceExtractorBuilder::default().build()?;
     let extracted = ext.extract(book)?;
     let mut buf = Vec::default();
+
+    let custom_entities = default_custom_entities();
     let parsed_chapters = extracted
         .unique_candidates()
         .into_iter()
         .map(|item| -> Result<SimpleChapter> {
-            let data = book.get_resource_by_path(&item.path)?;
-            read_content_simple(item.path_as_string(), item.label, data, &mut buf)
+            let path = unhash_path(&item);
+            let data = book
+                .get_resource_by_path(&*path)
+                .with_context(|| format!("Failed to get resource: {:?}", item))?;
+            read_content_simple(
+                item.path_as_string(),
+                item.label,
+                data,
+                &mut buf,
+                &custom_entities,
+            )
         })
         .collect::<Result<Vec<SimpleChapter>>>()?;
     Ok(SimpleBook {
