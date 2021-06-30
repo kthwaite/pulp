@@ -8,7 +8,7 @@ use epub::doc::EpubDoc;
 
 use pulp::cat::simple::transform_simple;
 use pulp::extract::{flatten_navpoints, ResourceExtractorBuilder};
-use pulp::find::EbookDirIter;
+use pulp::find::EbookFinder;
 use pulp::meta;
 
 fn load_epub(cmd_args: &ArgMatches) -> Result<EpubDoc<BufReader<File>>> {
@@ -154,17 +154,12 @@ fn main() -> Result<()> {
         ("batch", Some(cmd_args)) => {
             let mut file_list: Vec<PathBuf> = vec![];
             if let Some(dir) = cmd_args.value_of("dir") {
-                file_list.extend(dir.iter_ebooks()?);
+                file_list.extend(EbookFinder::new_from_path(dir)?);
             };
             file_list.sort();
             if cmd_args.is_present("dry-run") {
                 for path in file_list {
-                    match path.to_str() {
-                        Some(path) => println!("{}", path),
-                        None => {
-                            println!("{}", path.to_string_lossy());
-                        }
-                    }
+                    println!("{}", path.display());
                 }
             }
         }
