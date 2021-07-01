@@ -197,7 +197,7 @@ impl ResourceExtractorBuilder {
     }
 }
 
-///
+/// Helper for extracting resources, matching on label or filename.
 #[derive(Debug, Clone)]
 pub struct ResourceExtractor {
     pub ignore_labels: Regex,

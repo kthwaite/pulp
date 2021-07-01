@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek};
-use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use epub::doc::EpubDoc;
@@ -16,7 +15,7 @@ use crate::{
 /// Simple representation of book chapter content.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SimpleChapter {
-    ///
+    /// Path to document in epub.
     doc: String,
     /// Label in toc.ncx, if any
     label: String,
@@ -41,6 +40,7 @@ impl std::convert::From<SimpleAggregator> for SimpleChapter {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SimpleBook {
     meta: HashMap<String, MetaVar>,
+    ignored: Vec<ResourceInfo>,
     chapters: Vec<SimpleChapter>,
 }
 
@@ -258,6 +258,7 @@ impl SimpleTransformer {
         let meta_map = crate::meta::meta_vars_from_metadata(book);
         Ok(SimpleBook {
             meta: meta_map,
+            ignored: extracted.ignored,
             chapters: parsed_chapters,
         })
     }
