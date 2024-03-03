@@ -78,6 +78,23 @@ pub fn cat_span_recursive<'a, W: Write>(
     }
 }
 
+pub fn consume_header(node: &roxmltree::Node) -> String {
+    let mut header = String::new();
+    for child in node.descendants() {
+        match child.node_type() {
+            roxmltree::NodeType::Text => {
+                header.push_str(child.text().unwrap_or(""));
+            }
+            roxmltree::NodeType::Element => match child.tag_name().name() {
+                "br" => header.push_str("\n"),
+                _ => (),
+            },
+            _ => (),
+        }
+    }
+    header
+}
+
 pub fn cat_json(chapters: &[(String, Vec<u8>)]) -> Result<Vec<Chapter>, Error> {
     let mut chaps = Vec::<Chapter>::new();
     'chapter_iter: for (res, chapter) in chapters {
@@ -92,14 +109,8 @@ pub fn cat_json(chapters: &[(String, Vec<u8>)]) -> Result<Vec<Chapter>, Error> {
             if let "body" = node.tag_name().name() {
                 for child in node.descendants() {
                     match child.tag_name().name() {
-                        "h1" | "h2" => {
-                            let head = child
-                                .descendants()
-                                .filter(|desc| desc.node_type() == roxmltree::NodeType::Text)
-                                .fold(String::new(), |mut accu, desc| {
-                                    accu.push_str(desc.text().unwrap_or(""));
-                                    accu
-                                });
+                        "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
+                            let head = consume_header(&node);
                             if first_header {
                                 first_header = false;
                                 chap.header = head;
